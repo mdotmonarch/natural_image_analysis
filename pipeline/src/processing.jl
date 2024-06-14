@@ -63,14 +63,12 @@ function read_raw_normalize_and_average(dataset)
 
 		events = [split(line, ",")[2] for line in csv_file]
 		events = events[2:end]
-		events = [parse(Int, e) for (i, e) in enumerate(events) if event_lengths[i] > 20000*60]
+		events = [parse(Int, e) for (i, e) in enumerate(events) if event_lengths[i] > sampling_rate*60]
 
-		event_lengths = [e_l for e_l in event_lengths if e_l > 20000*60]
-		min_event_length = minimum(event_lengths)
-
+		println("Number of events: ", length(events))
 
 		signal_length = trunc(Int, length(stream["ChannelData"])/252)	# 252 channels
-		average_signal = zeros(min_event_length)
+		average_signal = zeros(sampling_rate*10)
 		for i in 1:252
 			electrode_label = "electrode_"*stream["InfoChannel"][i][:Label]
 			println("Processing electrode #"*string(i-1)*": "*electrode_label)
@@ -82,9 +80,9 @@ function read_raw_normalize_and_average(dataset)
 			signal = [s*1000 for s in signal] # Convert from V to mV
 
 			# avg repetitions
-			avg_repetitions = zeros(min_event_length)
+			avg_repetitions = zeros(sampling_rate*10)
 			for event in events
-				avg_repetitions = avg_repetitions + signal[event:event+min_event_length-1]
+				avg_repetitions = avg_repetitions + signal[event:event+(sampling_rate*10)-1]
 			end
 			avg_repetitions = avg_repetitions ./ length(events)
 
@@ -139,7 +137,7 @@ function resample_signal(dataset, resampling_rate)
 	h5open("./pipeline/processed_data/"*dataset*"_processed.h5", "cw") do processed_file
 		# check if average_signal group exists
 		if group_check(processed_file, ["signals", "complete"])
-			println("Skipping signal to noise ratio selection.")
+			println("Skipping signal resampling.")
 			return
 		end
 
@@ -151,7 +149,7 @@ function resample_signal(dataset, resampling_rate)
 		step = trunc(Int, sampling_rate / resampling_rate)
 		resampled_signal = filtered_signal[1:step:end]
 
-		processed_file["signals/complete/data"] = resampled_signal
+		processed_file["signals/complete/data"] = resampled_signal[1:trunc(Int, 10*resampling_rate)]
 		processed_file["signals/meta/resampling_rate"] = resampling_rate
 		println("Done.")
 	end
