@@ -48,7 +48,6 @@ datasets = [
 	"MR-0582_nd4",
 	"MR-0587_nd4",
 	"MR-0588_nd4",
-	#=
 	# Double 3m male
 	"MR-0575_nd4",
 	"MR-0583_nd4",
@@ -57,7 +56,6 @@ datasets = [
 	"MR-0579_nd4",
 	"MR-0585_nd4",
 	"MR-0586_nd4",
-	=#
 	# WT 6m male
 	"MR-0282",
 	"MR-0276",
@@ -120,4 +118,12 @@ for dataset in datasets
 	read_raw_normalize_and_average(dataset)
 	filter_signal(dataset, filter)
 	resample_signal(dataset, resampling_rate)
+
+	# compute complexity curve
+	compute_complexity_curve(dataset, "complete", "RCMSE", 2, 0.2, [i for i in 1:45])
+
+	# compute linear regression
+	compute_linear_regression(dataset, "complete", "RCMSE", 0.2)
 end
+
+println("Processing complete.")

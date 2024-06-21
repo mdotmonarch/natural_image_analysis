@@ -42,8 +42,55 @@ sampling_rate = 20000
 resampling_rate = 250
 nyquist_frequency = 0.5 * sampling_rate
 
+function generate_electrodes_raw(dataset)
+	h5open("./data/"*dataset*"_electrodes_raw.h5", "cw") do electrodes_raw_file
+		# check electrode_0 exists
+		if group_check(electrodes_raw_file, ["electrode_0"])
+			println("Skipping creating electrodes_raw file.")
+			return
+		end
+
+		# open raw file
+		file = h5open("./data/"*dataset*"_natural_images.h5", "r")
+		stream = read(file, "Data/Recording_0/AnalogStream/Stream_0")
+		close(file)
+
+		# open event list file
+		csv_file = readlines("./data/event_list_"*dataset*".csv")
+		event_lengths = [split(line, ",")[5] for line in csv_file]
+		event_lengths = event_lengths[2:end]
+		event_lengths = [parse(Int, e_l) for e_l in event_lengths]
+
+		events = [split(line, ",")[2] for line in csv_file]
+		events = events[2:end]
+		events = [parse(Int, e) for (i, e) in enumerate(events) if event_lengths[i] > sampling_rate*60]
+
+		println("Number of events: ", length(events))
+
+		signal_length = trunc(Int, length(stream["ChannelData"])/252)	# 252 channels
+
+		for i in 1:252
+			info = stream["InfoChannel"][i]
+			signal_raw = stream["ChannelData"][signal_length*(i-1)+1:signal_length*i]
+
+			signal = signal_reconstruct(signal_raw, info)
+			signal = [s*1000 for s in signal] # Convert from V to mV
+
+			# avg repetitions
+			avg_repetitions = zeros(sampling_rate*11)
+			for event in events
+				avg_repetitions = avg_repetitions + signal[event:event+(sampling_rate*11)-1]
+			end
+			avg_repetitions = avg_repetitions ./ length(events)
+
+			electrodes_raw_file["electrode_"*string(i-1)*"/datos"] = avg_repetitions
+		end
+		println("Done.")
+	end
+end
+
 function read_raw_normalize_and_average(dataset)
-	h5open("./pipeline/processed_data/"*dataset*"_processed.h5", "cw") do processed_file
+	h5open("./pipeline_fixed_SNR/processed_data/"*dataset*"_processed.h5", "cw") do processed_file
 		# check if average_signal group exists
 		if group_check(processed_file, ["average_signal"])
 			println("Skipping signal averaging.")
@@ -102,7 +149,7 @@ end
 
 function filter_signal(dataset, filter)
 	# open processed file
-	h5open("./pipeline/processed_data/"*dataset*"_processed.h5", "cw") do processed_file
+	h5open("./pipeline_fixed_SNR/processed_data/"*dataset*"_processed.h5", "cw") do processed_file
 		# check if average_signal group exists
 		if group_check(processed_file, ["filtered_signal"])
 			println("Skipping signal filtering.")
@@ -134,7 +181,7 @@ end
 
 function resample_signal(dataset, resampling_rate)
 	# open processed file
-	h5open("./pipeline/processed_data/"*dataset*"_processed.h5", "cw") do processed_file
+	h5open("./pipeline_fixed_SNR/processed_data/"*dataset*"_processed.h5", "cw") do processed_file
 		# check if average_signal group exists
 		if group_check(processed_file, ["signals", "complete"])
 			println("Skipping signal resampling.")
@@ -157,7 +204,7 @@ end
 
 function compute_complexity_curve(dataset, segment, type, m, r, scales)
 	# open processed file
-	h5open("./pipeline/processed_data/"*dataset*"_processed.h5", "cw") do processed_file
+	h5open("./pipeline_fixed_SNR/processed_data/"*dataset*"_processed.h5", "cw") do processed_file
 		# check if complexity group exists
 		if group_check(processed_file, ["complexity", segment, type, string(r)])
 			println("Skipping signal to noise ratio selection.")
@@ -189,7 +236,7 @@ end
 
 function compute_linear_regression(dataset, segment, type, r)
 	# open processed file
-	h5open("./pipeline/processed_data/"*dataset*"_processed.h5", "cw") do processed_file
+	h5open("./pipeline_fixed_SNR/processed_data/"*dataset*"_processed.h5", "cw") do processed_file
 		# check if complexity group exists
 		if group_check(processed_file, ["complexity", segment, type, string(r), "meta", "linear_fit"])
 			println("Skipping linear regression.")
