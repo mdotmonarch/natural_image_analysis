@@ -4,6 +4,7 @@
 using Statistics
 using Combinatorics
 using Trapz
+using CurveFit
 
 function chebyshev_distance(x, y)
 	return maximum(abs.(x - y))
@@ -54,8 +55,6 @@ function multiscale_entropy(signal, m, r, e, scales = [i for i in 1:trunc(Int, l
 	en_list = Float64[]
 
 	for scale in scales
-		println("Scale: ", scale)
-
 		# coarse-graining
 		ratio = trunc(Int, N / scale)
 		coarse_signal = zeros(ratio)
@@ -80,8 +79,6 @@ function composite_multiscale_entropy(signal, m, r, e, scales = [i for i in 1:tr
 	en_list = Float64[]
 
 	for scale in scales
-		println("Scale: ", scale)
-
 		# multiple coarse-graining
 		cumulative_en = 0
 		tau = length(signal)%scale
@@ -113,8 +110,6 @@ function refined_composite_multiscale_entropy(signal, m, r, e, scales = [i for i
 	en_list = Float64[]
 
 	for scale in scales
-		println("Scale: ", scale)
-		
 		# cumulative matches
 		A = 0
 		B = 0
@@ -147,11 +142,16 @@ function refined_composite_multiscale_entropy(signal, m, r, e, scales = [i for i
 	return en_list
 end
 
-function compute_complexity(curve)
+function compute_nAUC(curve)
 	#filter out NaN values
 	curve = curve[.!isnan.(curve)]
 	#filter out Inf values
 	curve = curve[.!isinf.(curve)]
 
 	return trapz([i for i in 1:length(curve)], curve)/length(curve)
+end
+
+function compute_LRS(curve, scales)
+	a, b = linear_fit(scales, curve)
+	return b
 end
