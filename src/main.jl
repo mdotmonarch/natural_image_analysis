@@ -120,12 +120,12 @@ for dataset in datasets
 	println("Processing dataset: ", dataset)
 
 	# preprocessing
-	filter_and_resample(dataset, filter, resampling_rate)
+	#filter_and_resample(dataset, filter, resampling_rate)
 
 	# processing
-	get_segments(dataset, 10)
-	normalize_signals(dataset)
-	get_mean_signals(dataset, 10)
+	#get_segments(dataset, 10)
+	#normalize_signals(dataset)
+	#get_mean_signals(dataset, 10)
 
 	# entropy and complexity
 	compute_entropy_curve(dataset, "RCMSE", 2, 0.1, [i for i in 1:45])
@@ -134,5 +134,11 @@ for dataset in datasets
 	compute_entropy_curve(dataset, "RCMSE", 2, 0.4, [i for i in 1:45])
 	compute_entropy_curve(dataset, "RCMSE", 2, 0.5, [i for i in 1:45])
 end
+
+# plots
+include("plots.jl")
+
+# analysis
+include("analysis.jl")
 
 println("Processing complete.")
