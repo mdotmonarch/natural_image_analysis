@@ -5,6 +5,8 @@ using HDF5
 using Plots
 using StatsPlots
 using DSP
+using HypothesisTests
+using Measures
 
 include("processing.jl")
 include("entropy.jl")
@@ -646,6 +648,27 @@ grouped_datasets["H"] = [
 	"MR-0588_nd4",
 ]
 
+grouped_s_datasets = Dict()
+grouped_s_datasets["male"] = []
+grouped_s_datasets["female"] = []
+
+grouped_s_datasets["male"] = [grouped_s_datasets["male"]; grouped_datasets["A"][1:9]]
+grouped_s_datasets["female"] = [grouped_s_datasets["female"]; grouped_datasets["A"][10:end]]
+grouped_s_datasets["male"] = [grouped_s_datasets["male"]; grouped_datasets["B"][1:4]]
+grouped_s_datasets["female"] = [grouped_s_datasets["female"]; grouped_datasets["B"][5:end]]
+grouped_s_datasets["male"] = [grouped_s_datasets["male"]; grouped_datasets["C"][1:2]]
+grouped_s_datasets["female"] = [grouped_s_datasets["female"]; grouped_datasets["C"][3:end]]
+grouped_s_datasets["male"] = [grouped_s_datasets["male"]; grouped_datasets["D"][1:7]]
+grouped_s_datasets["female"] = [grouped_s_datasets["female"]; grouped_datasets["D"][8:end]]
+grouped_s_datasets["male"] = [grouped_s_datasets["male"]; grouped_datasets["E"][1:2]]
+grouped_s_datasets["female"] = [grouped_s_datasets["female"]; grouped_datasets["E"][3:end]]
+grouped_s_datasets["male"] = [grouped_s_datasets["male"]; grouped_datasets["F"][1:5]]
+grouped_s_datasets["female"] = [grouped_s_datasets["female"]; grouped_datasets["F"][6:end]]
+grouped_s_datasets["male"] = [grouped_s_datasets["male"]; grouped_datasets["G"][1:2]]
+grouped_s_datasets["female"] = [grouped_s_datasets["female"]; grouped_datasets["G"][3:end]]
+grouped_s_datasets["male"] = [grouped_s_datasets["male"]; grouped_datasets["H"][1:4]]
+grouped_s_datasets["female"] = [grouped_s_datasets["female"]; grouped_datasets["H"][5:end]]
+
 datasets = []
 for group in groups
 	global datasets = [datasets; grouped_datasets[group]]
@@ -715,7 +738,7 @@ function signal_and_spectrogram_electrode_mean(dataset)
 		plot(p1, p2, layout=grid(2, 1, heights=[0.2 ,0.8]), size=(800, 900), dpi=300)
 
 		group = group_labels[findfirst(x -> dataset in x, grouped_datasets)]
-		savefig("./plots/$(group)/$(dataset)/signals/electrode_mean_$(e_f).png")
+		savefig("./plots/$(group)/$(dataset)/signals/electrode_mean_$(e_f).svg")
 	end
 
 	close(processed_file)
@@ -736,13 +759,18 @@ function SNR_map(dataset)
 		snr_map[coordinates[n][1], coordinates[n][2]] = snr
 	end
 
+	snr_map[1, 1] = NaN
+	snr_map[1, 16] = NaN
+	snr_map[16, 1] = NaN
+	snr_map[16, 16] = NaN
+
 	heatmap(snr_map, c=:viridis, title="SNR map of $(dataset)", size=(800, 800), dpi=300, xaxis=false, yaxis=false)
 	for n in 1:252
 		annotate!([(coordinates[n][1], coordinates[n][2], text(electrode_labels[n], 8, :black, :center))])
 	end
 
 	group = group_labels[findfirst(x -> dataset in x, grouped_datasets)]
-	savefig("./plots/$(group)/$(dataset)/signals/SNR_map.png")
+	savefig("./plots/$(group)/$(dataset)/signals/SNR_map.svg")
 
 	close(snr_file)
 end
@@ -772,7 +800,7 @@ function group_entropy_curves(group)
 		mean_entropy_curve /= count
 		plot!(mean_entropy_curve, color=v_color_index[group], lw=2)
 
-		savefig("./plots/$(group_labels[group])/group_entropy_curves_$(e_f).png")
+		savefig("./plots/$(group_labels[group])/group_entropy_curves_$(e_f).svg")
 	end
 end
 
@@ -789,7 +817,7 @@ function group_entropy_curves_extra(group)
 				continue
 			end
 			if dataset == "MR-0446" || dataset == "MR-0447" || dataset == "MR-0448" || dataset == "MR-0474" || dataset == "MR-0491" || dataset == "MR-0543"
-				plot!(entropy_data[e_f]["curve"], color=:yellow, alpha=0.5)
+				plot!(entropy_data[e_f]["curve"], color=:green, alpha=0.5)
 			else
 				plot!(entropy_data[e_f]["curve"], color=:black, alpha=0.2)
 			end
@@ -804,7 +832,7 @@ function group_entropy_curves_extra(group)
 		mean_entropy_curve /= count
 		plot!(mean_entropy_curve, color=v_color_index[group], lw=2)
 
-		savefig("./plots/extra/$(group_labels[group])/group_entropy_curves_$(e_f).png")
+		savefig("./plots/extra/$(group_labels[group])/group_entropy_curves_$(e_f).svg")
 	end
 end
 
@@ -836,7 +864,7 @@ function mean_entropy_curves_comparison()
 			plot!(mean_entropy_curves[group], color=v_color_index[group], label=group_labels[group], ls=v_ls_index[group])
 		end
 
-		savefig("./plots/RCMSE_0.2/mean_entropy_curves_comparison_$(e_f).png")
+		savefig("./plots/RCMSE_0.2/mean_entropy_curves_comparison_$(e_f).svg")
 	end
 end
 
@@ -909,7 +937,7 @@ function SNR_comparison(dataset, t, r)
 	plot(p1, p2..., p3..., layout=l, size=(900, 900), dpi=300)
 
 	group = group_labels[findfirst(x -> dataset in x, grouped_datasets)]
-	savefig("./plots/$(group)/$(dataset)/entropy/$(t)_$(r)_comparison.png")
+	savefig("./plots/$(group)/$(dataset)/entropy/$(t)_$(r)_comparison.svg")
 
 	close(entropy_file)
 end
@@ -918,35 +946,87 @@ end
 function LRS_map(dataset, t, r)
 	entropy_file = h5open("./entropy_data/$(dataset)_natural_images_entropy.h5", "r")
 	lrs_all = zeros(16, 16)
-	lrs_all[1, 1] = NaN
-	lrs_all[1, 16] = NaN
-	lrs_all[16, 1] = NaN
-	lrs_all[16, 16] = NaN
-
 	lrs_15 = zeros(16, 16)
-	lrs_15[1, 1] = NaN
-	lrs_15[1, 16] = NaN
-	lrs_15[16, 1] = NaN
-	lrs_15[16, 16] = NaN
-
 	lrs_30 = zeros(16, 16)
-	lrs_30[1, 1] = NaN
-	lrs_30[1, 16] = NaN
-	lrs_30[16, 1] = NaN
-	lrs_30[16, 16] = NaN
-
 	lrs_45 = zeros(16, 16)
-	lrs_45[1, 1] = NaN
-	lrs_45[1, 16] = NaN
-	lrs_45[16, 1] = NaN
-	lrs_45[16, 16] = NaN
-	
 	for i in 1:252
 		signal = read(entropy_file, "/$(t)/$(r)/electrode_$(i-1)/event_mean/curve")
 		lrs_all[coordinates[i][1], coordinates[i][2]] = compute_LRS(signal, [i for i in 1:45])
 		lrs_15[coordinates[i][1], coordinates[i][2]] = compute_LRS(signal[1:15], [i for i in 1:15])
 		lrs_30[coordinates[i][1], coordinates[i][2]] = compute_LRS(signal[16:30], [i for i in 16:30])
 		lrs_45[coordinates[i][1], coordinates[i][2]] = compute_LRS(signal[31:45], [i for i in 31:45])
+	end
+
+	lrs_all[1, 1] = NaN
+	lrs_all[1, 16] = NaN
+	lrs_all[16, 1] = NaN
+	lrs_all[16, 16] = NaN
+
+	lrs_15[1, 1] = NaN
+	lrs_15[1, 16] = NaN
+	lrs_15[16, 1] = NaN
+	lrs_15[16, 16] = NaN
+
+	lrs_30[1, 1] = NaN
+	lrs_30[1, 16] = NaN
+	lrs_30[16, 1] = NaN
+	lrs_30[16, 16] = NaN
+
+	lrs_45[1, 1] = NaN
+	lrs_45[1, 16] = NaN
+	lrs_45[16, 1] = NaN
+	lrs_45[16, 16] = NaN
+
+	p1 = heatmap(lrs_all, c=:viridis, title="$(t) $(r) all, LRS", size=(800, 800), dpi=300, xaxis=false, yaxis=false)
+	for n in 1:252
+		annotate!([(coordinates[n][1], coordinates[n][2], text(electrode_labels[n], 4, :black, :center))])
+	end
+	p2 = heatmap(lrs_15, c=:viridis, title="$(t) $(r) 1-15, LRS", size=(800, 800), dpi=300, xaxis=false, yaxis=false)
+	for n in 1:252
+		annotate!([(coordinates[n][1], coordinates[n][2], text(electrode_labels[n], 4, :black, :center))])
+	end
+	p3 = heatmap(lrs_30, c=:viridis, title="$(t) $(r) 16-30, LRS", size=(800, 800), dpi=300, xaxis=false, yaxis=false)
+	for n in 1:252
+		annotate!([(coordinates[n][1], coordinates[n][2], text(electrode_labels[n], 4, :black, :center))])
+	end
+	p4 = heatmap(lrs_45, c=:viridis, title="$(t) $(r) 31-45, LRS", size=(800, 800), dpi=300, xaxis=false, yaxis=false)
+	for n in 1:252
+		annotate!([(coordinates[n][1], coordinates[n][2], text(electrode_labels[n], 4, :black, :center))])
+	end
+	plot(p1, p2, p3, p4, layout=(2, 2), size=(1000, 800), dpi=300)
+
+	group = group_labels[findfirst(x -> dataset in x, grouped_datasets)]
+	savefig("./plots/$(group)/$(dataset)/entropy/LRS_map_$(t)_$(r)_none.svg")
+
+	# check if SNR file exists
+	if !isfile("../SNR/"*dataset*"_SNR.h5")
+		println("SNR file not found for dataset: ", dataset)
+		return
+	end
+
+	snr_file = h5open("../SNR/"*dataset*"_SNR.h5", "r")
+	snr_map = zeros(16, 16)
+	for n in 1:252
+		snr = read(snr_file, "electrode_$(n-1)/SNR")
+		snr_map[coordinates[n][1], coordinates[n][2]] = snr
+	end
+
+	snr_map[1, 1] = NaN
+	snr_map[1, 16] = NaN
+	snr_map[16, 1] = NaN
+	snr_map[16, 16] = NaN
+
+	# SNR = 3 dB
+
+	for i in 1:16
+		for j in 1:16
+			if snr_map[i, j] < 3
+				lrs_all[i, j] = NaN
+				lrs_15[i, j] = NaN
+				lrs_30[i, j] = NaN
+				lrs_45[i, j] = NaN
+			end
+		end
 	end
 
 	p1 = heatmap(lrs_all, c=:viridis, title="$(t) $(r) all, LRS", size=(800, 800), dpi=300, xaxis=false, yaxis=false)
@@ -968,7 +1048,41 @@ function LRS_map(dataset, t, r)
 	plot(p1, p2, p3, p4, layout=(2, 2), size=(1000, 800), dpi=300)
 
 	group = group_labels[findfirst(x -> dataset in x, grouped_datasets)]
-	savefig("./plots/$(group)/$(dataset)/entropy/LRS_map_$(t)_$(r).png")
+	savefig("./plots/$(group)/$(dataset)/entropy/LRS_map_$(t)_$(r)_snr_3.svg")
+
+	# SNR = 7 dB
+
+	for i in 1:16
+		for j in 1:16
+			if snr_map[i, j] < 7
+				lrs_all[i, j] = NaN
+				lrs_15[i, j] = NaN
+				lrs_30[i, j] = NaN
+				lrs_45[i, j] = NaN
+			end
+		end
+	end
+
+	p1 = heatmap(lrs_all, c=:viridis, title="$(t) $(r) all, LRS", size=(800, 800), dpi=300, xaxis=false, yaxis=false)
+	for n in 1:252
+		annotate!([(coordinates[n][1], coordinates[n][2], text(electrode_labels[n], 4, :black, :center))])
+	end
+	p2 = heatmap(lrs_15, c=:viridis, title="$(t) $(r) 1-15, LRS", size=(800, 800), dpi=300, xaxis=false, yaxis=false)
+	for n in 1:252
+		annotate!([(coordinates[n][1], coordinates[n][2], text(electrode_labels[n], 4, :black, :center))])
+	end
+	p3 = heatmap(lrs_30, c=:viridis, title="$(t) $(r) 16-30, LRS", size=(800, 800), dpi=300, xaxis=false, yaxis=false)
+	for n in 1:252
+		annotate!([(coordinates[n][1], coordinates[n][2], text(electrode_labels[n], 4, :black, :center))])
+	end
+	p4 = heatmap(lrs_45, c=:viridis, title="$(t) $(r) 31-45, LRS", size=(800, 800), dpi=300, xaxis=false, yaxis=false)
+	for n in 1:252
+		annotate!([(coordinates[n][1], coordinates[n][2], text(electrode_labels[n], 4, :black, :center))])
+	end
+	plot(p1, p2, p3, p4, layout=(2, 2), size=(1000, 800), dpi=300)
+
+	group = group_labels[findfirst(x -> dataset in x, grouped_datasets)]
+	savefig("./plots/$(group)/$(dataset)/entropy/LRS_map_$(t)_$(r)_snr_7.svg")
 
 	close(entropy_file)
 end
@@ -980,6 +1094,7 @@ function nAUC_map(dataset, t, r)
 	nauc_15 = zeros(16, 16)
 	nauc_30 = zeros(16, 16)
 	nauc_45 = zeros(16, 16)
+	
 	for i in 1:252
 		signal = read(entropy_file, "/$(t)/$(r)/electrode_$(i-1)/event_mean/curve")
 		nauc_all[coordinates[i][1], coordinates[i][2]] = compute_nAUC(signal)
@@ -987,6 +1102,27 @@ function nAUC_map(dataset, t, r)
 		nauc_30[coordinates[i][1], coordinates[i][2]] = compute_nAUC(signal[16:30])
 		nauc_45[coordinates[i][1], coordinates[i][2]] = compute_nAUC(signal[31:45])
 	end
+
+	nauc_all[1, 1] = NaN
+	nauc_all[1, 16] = NaN
+	nauc_all[16, 1] = NaN
+	nauc_all[16, 16] = NaN
+
+	nauc_15[1, 1] = NaN
+	nauc_15[1, 16] = NaN
+	nauc_15[16, 1] = NaN
+	nauc_15[16, 16] = NaN
+
+	nauc_30[1, 1] = NaN
+	nauc_30[1, 16] = NaN
+	nauc_30[16, 1] = NaN
+	nauc_30[16, 16] = NaN
+
+	nauc_45[1, 1] = NaN
+	nauc_45[1, 16] = NaN
+	nauc_45[16, 1] = NaN
+	nauc_45[16, 16] = NaN
+
 	p1 = heatmap(nauc_all, c=:viridis, title="$(t) $(r) all, nAUC", size=(800, 800), dpi=300, xaxis=false, yaxis=false)
 	for n in 1:252
 		annotate!([(coordinates[n][1], coordinates[n][2], text(electrode_labels[n], 4, :black, :center))])
@@ -1006,7 +1142,94 @@ function nAUC_map(dataset, t, r)
 	plot(p1, p2, p3, p4, layout=(2, 2), size=(1000, 800), dpi=300)
 
 	group = group_labels[findfirst(x -> dataset in x, grouped_datasets)]
-	savefig("./plots/$(group)/$(dataset)/entropy/nAUC_map_$(t)_$(r).png")
+	savefig("./plots/$(group)/$(dataset)/entropy/nAUC_map_$(t)_$(r)_none.svg")
+
+	# check if SNR file exists
+	if !isfile("../SNR/"*dataset*"_SNR.h5")
+		println("SNR file not found for dataset: ", dataset)
+		return
+	end
+
+	snr_file = h5open("../SNR/"*dataset*"_SNR.h5", "r")
+	snr_map = zeros(16, 16)
+	for n in 1:252
+		snr = read(snr_file, "electrode_$(n-1)/SNR")
+		snr_map[coordinates[n][1], coordinates[n][2]] = snr
+	end
+
+	snr_map[1, 1] = NaN
+	snr_map[1, 16] = NaN
+	snr_map[16, 1] = NaN
+	snr_map[16, 16] = NaN
+
+	# SNR = 3 dB
+
+	for i in 1:16
+		for j in 1:16
+			if snr_map[i, j] < 3
+				nauc_all[i, j] = NaN
+				nauc_15[i, j] = NaN
+				nauc_30[i, j] = NaN
+				nauc_45[i, j] = NaN
+			end
+		end
+	end
+
+	p1 = heatmap(nauc_all, c=:viridis, title="$(t) $(r) all, nAUC", size=(800, 800), dpi=300, xaxis=false, yaxis=false)
+	for n in 1:252
+		annotate!([(coordinates[n][1], coordinates[n][2], text(electrode_labels[n], 4, :black, :center))])
+	end
+	p2 = heatmap(nauc_15, c=:viridis, title="$(t) $(r) 1-15, nAUC", size=(800, 800), dpi=300, xaxis=false, yaxis=false)
+	for n in 1:252
+		annotate!([(coordinates[n][1], coordinates[n][2], text(electrode_labels[n], 4, :black, :center))])
+	end
+	p3 = heatmap(nauc_30, c=:viridis, title="$(t) $(r) 16-30, nAUC", size=(800, 800), dpi=300, xaxis=false, yaxis=false)
+	for n in 1:252
+		annotate!([(coordinates[n][1], coordinates[n][2], text(electrode_labels[n], 4, :black, :center))])
+	end
+	p4 = heatmap(nauc_45, c=:viridis, title="$(t) $(r) 31-45, nAUC", size=(800, 800), dpi=300, xaxis=false, yaxis=false)
+	for n in 1:252
+		annotate!([(coordinates[n][1], coordinates[n][2], text(electrode_labels[n], 4, :black, :center))])
+	end
+	plot(p1, p2, p3, p4, layout=(2, 2), size=(1000, 800), dpi=300)
+
+	group = group_labels[findfirst(x -> dataset in x, grouped_datasets)]
+	savefig("./plots/$(group)/$(dataset)/entropy/nAUC_map_$(t)_$(r)_snr_3.svg")
+
+	# SNR = 7 dB
+
+	for i in 1:16
+		for j in 1:16
+			if snr_map[i, j] < 7
+				nauc_all[i, j] = NaN
+				nauc_15[i, j] = NaN
+				nauc_30[i, j] = NaN
+				nauc_45[i, j] = NaN
+			end
+		end
+	end
+
+	p1 = heatmap(nauc_all, c=:viridis, title="$(t) $(r) all, nAUC", size=(800, 800), dpi=300, xaxis=false, yaxis=false)
+	for n in 1:252
+		annotate!([(coordinates[n][1], coordinates[n][2], text(electrode_labels[n], 4, :black, :center))])
+	end
+	p2 = heatmap(nauc_15, c=:viridis, title="$(t) $(r) 1-15, nAUC", size=(800, 800), dpi=300, xaxis=false, yaxis=false)
+	for n in 1:252
+		annotate!([(coordinates[n][1], coordinates[n][2], text(electrode_labels[n], 4, :black, :center))])
+	end
+	p3 = heatmap(nauc_30, c=:viridis, title="$(t) $(r) 16-30, nAUC", size=(800, 800), dpi=300, xaxis=false, yaxis=false)
+	for n in 1:252
+		annotate!([(coordinates[n][1], coordinates[n][2], text(electrode_labels[n], 4, :black, :center))])
+	end
+	p4 = heatmap(nauc_45, c=:viridis, title="$(t) $(r) 31-45, nAUC", size=(800, 800), dpi=300, xaxis=false, yaxis=false)
+	for n in 1:252
+		annotate!([(coordinates[n][1], coordinates[n][2], text(electrode_labels[n], 4, :black, :center))])
+	end
+	plot(p1, p2, p3, p4, layout=(2, 2), size=(1000, 800), dpi=300)
+
+	group = group_labels[findfirst(x -> dataset in x, grouped_datasets)]
+	savefig("./plots/$(group)/$(dataset)/entropy/nAUC_map_$(t)_$(r)_snr_7.svg")
+
 	close(entropy_file)
 end
 
@@ -1016,8 +1239,12 @@ function LRS_distribution(t, r)
 		for e_f in ["none", "snr_3", "snr_7"]
 			# LRS distribution
 			local grouped_lrs = Dict()
+			local grouped_lrs_m = Dict()
+			local grouped_lrs_f = Dict()
 			for group in groups
 				grouped_lrs[group] = Float64[]
+				grouped_lrs_m[group] = Float64[]
+				grouped_lrs_f[group] = Float64[]
 			end
 			for group in groups
 				for dataset in grouped_datasets[group]
@@ -1038,22 +1265,30 @@ function LRS_distribution(t, r)
 					end
 
 					push!(grouped_lrs[group], lrs)
+					if dataset in grouped_s_datasets["male"]
+						push!(grouped_lrs_m[group], lrs)
+					else
+						push!(grouped_lrs_f[group], lrs)
+					end
 					close(entropy_file)
 				end
 			end
 			plot(size=(1000, 600), dpi=300, legend=:none)
 			a_data = [grouped_lrs[group] for group in groups]
+			a_m_data = [grouped_lrs_m[group] for group in groups]
+			a_f_data = [grouped_lrs_f[group] for group in groups]
 
 			violin_labels = [group_labels[group]*" ($(length(grouped_lrs[group])))" for group in groups]
 			violin_labels = reshape(violin_labels, 1, length(violin_labels))
 
 			violin!(violin_labels, a_data, label=violin_labels, color = v_color, fill = v_fill, ls=v_ls)
-			dotplot!(violin_labels, a_data, label=false, line = 0, marker=:black, side=:left, mode=:none, alpha=0.3)
+			dotplot!(violin_labels, a_m_data, label=false, line = 0, marker=:blue, side=:left, mode=:none, alpha=0.5)
+			dotplot!(violin_labels, a_f_data, label=false, line = 0, marker=:pink, side=:left, mode=:none, alpha=0.5)
 			plot!(xlabel="Group", ylabel="LRS", title="LRS distribution of $(t) $(r) $(lim), electrode filter: $(e_f)")
 
 			println("subject count:", length([(a_data...)...]) )
 
-			savefig("./plots/$(t)_$(r)/LRS_distribution_$(e_f)_$(lim).png")
+			savefig("./plots/$(t)_$(r)/LRS_distribution_$(e_f)_$(lim).svg")
 		end
 	end
 end
@@ -1064,8 +1299,12 @@ function LRS_alt_distribution(t, r)
 		for e_f in ["none", "snr_3", "snr_7"]
 			# LRS distribution
 			local grouped_lrs = Dict()
+			local grouped_lrs_m = Dict()
+			local grouped_lrs_f = Dict()
 			for group in groups
 				grouped_lrs[group] = Float64[]
+				grouped_lrs_m[group] = Float64[]
+				grouped_lrs_f[group] = Float64[]
 			end
 			for group in groups
 				for dataset in grouped_datasets[group]
@@ -1130,6 +1369,11 @@ function LRS_alt_distribution(t, r)
 					end
 
 					push!(grouped_lrs[group], lrs)
+					if dataset in grouped_s_datasets["male"]
+						push!(grouped_lrs_m[group], lrs)
+					else
+						push!(grouped_lrs_f[group], lrs)
+					end
 
 					close(entropy_file)
 				end
@@ -1137,17 +1381,20 @@ function LRS_alt_distribution(t, r)
 
 			plot(size=(1000, 600), dpi=300, legend=:none)
 			a_data = [grouped_lrs[group] for group in groups]
+			a_m_data = [grouped_lrs_m[group] for group in groups]
+			a_f_data = [grouped_lrs_f[group] for group in groups]
 
 			violin_labels = [group_labels[group]*" ($(length(grouped_lrs[group])))" for group in groups]
 			violin_labels = reshape(violin_labels, 1, length(violin_labels))
 
 			violin!(violin_labels, a_data, label=violin_labels, color = v_color, fill = v_fill, ls=v_ls)
-			dotplot!(violin_labels, a_data, label=false, line = 0, marker=:black, side=:left, mode=:none, alpha=0.3)
+			dotplot!(violin_labels, a_m_data, label=false, line = 0, marker=:blue, side=:left, mode=:none, alpha=0.5)
+			dotplot!(violin_labels, a_f_data, label=false, line = 0, marker=:pink, side=:left, mode=:none, alpha=0.5)
 			plot!(xlabel="Group", ylabel="LRS", title="LRS alt distribution of $(t) $(r) $(lim), electrode filter: $(e_f)")
 
 			println("subject count:", length([(a_data...)...]) )
 
-			savefig("./plots/$(t)_$(r)/LRS_alt_distribution_$(e_f)_$(lim).png")
+			savefig("./plots/$(t)_$(r)/LRS_alt_distribution_$(e_f)_$(lim).svg")
 		end
 	end
 end
@@ -1158,8 +1405,12 @@ function nAUC_distribution(t, r)
 		for e_f in ["none", "snr_3", "snr_7"]
 			# nAUC distribution
 			local grouped_nauc = Dict()
+			local grouped_nauc_m = Dict()
+			local grouped_nauc_f = Dict()
 			for group in groups
 				grouped_nauc[group] = Float64[]
+				grouped_nauc_m[group] = Float64[]
+				grouped_nauc_f[group] = Float64[]
 			end
 			for group in groups
 				for dataset in grouped_datasets[group]
@@ -1180,22 +1431,30 @@ function nAUC_distribution(t, r)
 					end
 
 					push!(grouped_nauc[group], nauc)
+					if dataset in grouped_s_datasets["male"]
+						push!(grouped_nauc_m[group], nauc)
+					else
+						push!(grouped_nauc_f[group], nauc)
+					end
 					close(entropy_file)
 				end
 			end
 			plot(size=(1000, 600), dpi=300, legend=:none)
 			a_data = [grouped_nauc[group] for group in groups]
+			a_m_data = [grouped_nauc_m[group] for group in groups]
+			a_f_data = [grouped_nauc_f[group] for group in groups]
 
 			violin_labels = [group_labels[group]*" ($(length(grouped_nauc[group])))" for group in groups]
 			violin_labels = reshape(violin_labels, 1, length(violin_labels))
 
 			violin!(violin_labels, a_data, label=violin_labels, color = v_color, fill = v_fill, ls=v_ls)
-			dotplot!(violin_labels, a_data, label=false, line = 0, marker=:black, side=:left, mode=:none, alpha=0.3)
+			dotplot!(violin_labels, a_m_data, label=false, line = 0, marker=:blue, side=:left, mode=:none, alpha=0.5)
+			dotplot!(violin_labels, a_f_data, label=false, line = 0, marker=:pink, side=:left, mode=:none, alpha=0.5)
 			plot!(xlabel="Group", ylabel="nAUC", title="nAUC distribution of $(t) $(r) $(lim), electrode filter: $(e_f)")
 
 			println("subject count:", length([(a_data...)...]) )
 
-			savefig("./plots/$(t)_$(r)/nAUC_distribution_$(e_f)_$(lim).png")
+			savefig("./plots/$(t)_$(r)/nAUC_distribution_$(e_f)_$(lim).svg")
 		end
 	end
 end
@@ -1206,8 +1465,12 @@ function nAUC_alt_distribution(t, r)
 		for e_f in ["none", "snr_3", "snr_7"]
 			# nAUC distribution
 			local grouped_nauc = Dict()
+			local grouped_nauc_m = Dict()
+			local grouped_nauc_f = Dict()
 			for group in groups
 				grouped_nauc[group] = Float64[]
+				grouped_nauc_m[group] = Float64[]
+				grouped_nauc_f[group] = Float64[]
 			end
 			for group in groups
 				for dataset in grouped_datasets[group]
@@ -1272,24 +1535,31 @@ function nAUC_alt_distribution(t, r)
 					end
 
 					push!(grouped_nauc[group], nauc)
-
+					if dataset in grouped_s_datasets["male"]
+						push!(grouped_nauc_m[group], nauc)
+					else
+						push!(grouped_nauc_f[group], nauc)
+					end
 					close(entropy_file)
 				end
 			end
 
 			plot(size=(1000, 600), dpi=300, legend=:none)
 			a_data = [grouped_nauc[group] for group in groups]
+			a_m_data = [grouped_nauc_m[group] for group in groups]
+			a_f_data = [grouped_nauc_f[group] for group in groups]
 
 			violin_labels = [group_labels[group]*" ($(length(grouped_nauc[group])))" for group in groups]
 			violin_labels = reshape(violin_labels, 1, length(violin_labels))
 
 			violin!(violin_labels, a_data, label=violin_labels, color = v_color, fill = v_fill, ls=v_ls)
-			dotplot!(violin_labels, a_data, label=false, line = 0, marker=:black, side=:left, mode=:none, alpha=0.3)
+			dotplot!(violin_labels, a_m_data, label=false, line = 0, marker=:blue, side=:left, mode=:none, alpha=0.5)
+			dotplot!(violin_labels, a_f_data, label=false, line = 0, marker=:pink, side=:left, mode=:none, alpha=0.5)
 			plot!(xlabel="Group", ylabel="nAUC", title="nAUC alt distribution of $(t) $(r) $(lim), electrode filter: $(e_f)")
 
 			println("subject count:", length([(a_data...)...]) )
 
-			savefig("./plots/$(t)_$(r)/nAUC_alt_distribution_$(e_f)_$(lim).png")
+			savefig("./plots/$(t)_$(r)/nAUC_alt_distribution_$(e_f)_$(lim).svg")
 		end
 	end
 end
@@ -1379,7 +1649,7 @@ function STD_LRS_distribution(t, r)
 
 			println("subject count:", length([(a_data...)...]) )
 
-			savefig("./plots/extra/STD_distribution_LRS_$(e_f)_$(lim).png")
+			savefig("./plots/extra/STD_distribution_LRS_$(e_f)_$(lim).svg")
 		end
 	end
 end
@@ -1469,7 +1739,7 @@ function STD_nAUC_distribution(t, r)
 
 			println("subject count:", length([(a_data...)...]) )
 
-			savefig("./plots/extra/STD_distribution_nAUC_$(e_f)_$(lim).png")
+			savefig("./plots/extra/STD_distribution_nAUC_$(e_f)_$(lim).svg")
 		end
 	end
 end
@@ -1514,34 +1784,33 @@ end
 
 for dataset in datasets
 	#signal_and_spectrogram_electrode_mean(dataset)
-	#SNR_map(dataset)
+	SNR_map(dataset)
 
 	#entropy
 	for t in t_list
 		for r in r_list
-			#SNR_comparison(dataset, t, r)
-			#LRS_map(dataset, t, r)
-			#nAUC_map(dataset, t, r)
+			SNR_comparison(dataset, t, r)
+			LRS_map(dataset, t, r)
+			nAUC_map(dataset, t, r)
 		end
 	end
 end
 
 for group in groups
-	#group_entropy_curves(group)
-	#group_entropy_curves_extra(group)
+	group_entropy_curves(group)
 end
 
-#mean_entropy_curves_comparison()
+mean_entropy_curves_comparison()
 
 # LRS and nAUC distribution
 for t in t_list
 	for r in r_list
 		LRS_distribution(t, r)
-		#LRS_alt_distribution(t, r)
-		#nAUC_distribution(t, r)
-		#nAUC_alt_distribution(t, r)
-		#STD_LRS_distribution(t, r)
-		#STD_nAUC_distribution(t, r)
+		LRS_alt_distribution(t, r)
+		nAUC_distribution(t, r)
+		nAUC_alt_distribution(t, r)
+#		STD_LRS_distribution(t, r)
+#		STD_nAUC_distribution(t, r)
 	end
 end
 
